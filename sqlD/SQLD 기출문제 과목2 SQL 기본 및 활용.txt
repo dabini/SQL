@@ -1,0 +1,1227 @@
+과목 2 SQL 기본 및 활용
+	제 1장 SQL 기본
+		제 1절 관계형 데이터베이스 개요
+		제 2절 DDL
+		제 3절 DML
+		제 4절 TCL
+		제 5절 WHERE 절
+		제 6절 함수(Function)
+		제 7절 GROUP BY, Having 절
+		제 8절 Order by 절
+		제 9절 조인(Join)
+--------------------------------------------------------------------------------------------------------
+문제 1. 아래의 쿼리를 만족하는 결과를 가장 잘 설명한 것은? [기출 21회 - 다중 행 비교 연산자 IN, ALL, ANY, SOME, EXISTS]
+SELECT A.*
+FROM HR.EMPLOYEES A,
+	HR.EMPLOYEES B
+WHERE 1=1
+AND A.MANAGER_ID = B.EMPLOYEE_ID
+AND B.SALARY >= ANY A.SALARY;
+
+1) 어떤 부하 직원보다도 연봉이 높은 상사
+2) 어떤 부하 직원보다도 연봉이 낮은 상사
+3) 어떤 상사 보다도 연봉이 높은 부하 직원
+4) 어떤 상사 보다도 연봉이 낮은 부하 직원
+
+--------------------------
+	사전 지식
+* 다중 행 비교 연산자 ANY (서브쿼리)
+ - 서브쿼리의 결과에 존재하는 어느 하나의 값이라도 만족하는 조건을 의미.
+ 비교연산자로 " > " 를 사용했다면 메인쿼리는 서브쿼리의 값들 중 어떤 값이라도
+ 만족하면 되므로 서브쿼리의 결과의 최소값보다 큰 모든 건이 조건을 만족
+ - SOME 과 동일
+
+	해답
+A.MANAGER_ID = B.EMPLOYEE_ID 이므로 
+A 테이블의 메니저 아이디가 B 테이블의 직원 아이디이므로 
+A 가 직원, B 가 상사라고 볼수 있음
+
+SELECT A.EMPLOYEE_ID AS "부하직원", A.LAST_NAME, A.MANAGER_ID "상사",
+A.SALARY AS "부하연봉",
+B.SALARY AS "상사연봉"
+FROM HR.EMPLOYEES A, -- EMPLOYEE SALARY
+ HR.EMPLOYEES B -- MANAGER SALARY
+WHERE 1=1
+AND A.MANAGER_ID = B.EMPLOYEE_ID
+AND B.SALARY >= ANY A.SALARY;
+이므로 상사의 연봉이 어떤 부하직원보다도 큰 결과를 뽑는 sql임
+
+--------------------------------------------------------------------------------------------------------
+
+2. 아래의 쿼리의 결과를 만족하는 결과로 가장 알맞은 것은? [기출 21회 - 다중 행 비교 연산자 IN, ALL, ANY, SOME, EXISTS]
+DEPARTMENT_ID : 
+	NULL, 10,20,30,40,50,~90,100,110
+
+SELECT 
+	DISTINCT DEPARTMENT_ID
+FROM HR.EMPLOYEES A
+WHERE A.DEPARTMENT_ID <= ALL (30,50);
+
+1) 10,20
+2) 10,20,30
+3) 10,20,30,40
+4) 10,20,30,40,50
+
+--------------------------
+* 비교연산자 ALL (다중 행 서브쿼리)
+ - 서브쿼리의 결과에 존재하는 모든값을 만족하는 조건을 의미.
+ - 비교연산자로 " > " 를 사용했다면 메인쿼리는 서브쿼리의 모든 값을
+ - 만족해야 하므로 서브쿼리의 결과의 최대값보다 큰 모든 건이 조건을 만족
+
+해답
+A.DEPARTMENT_ID <= ALL(30,50) 이므로 
+30 보다 작고, 50 보다 작아야 함
+즉, 30보다 작거나 같은 값이 모두 해당됨
+
+--------------------------------------------------------------------------------------------------------
+
+3. 아래와 같은 테이블에 데이터가 있다. 각 SQL 에 대한 결과값이 잘못된 것은? [기출 21회 - 다중 행 비교 연산자 IN, ALL, ANY, SOME, EXISTS]
+TABLE SQLD_21_01 	TABLE SQLD_21_02
+N1 	V1 		N1 	V1
+--------- ---------- 	--------- ----------
+1 	A 		1 	A
+2 	2
+3 	B 		3 	B
+4 	C
+
+1) SELECT * FROM SQLD_21_01
+WHERE V1 IN (SELECT V1 FROM SQLD_21_02);
+
+N1 	V1
+--------- ----------
+1 	A
+3 	B
+2) SELECT * FROM SQLD_21_01
+WHERE V1 NOT IN (SELECT V1 FROM SQLD_21_02);
+N1 	V1
+--------- ----------
+4 	C
+
+3) SELECT * FROM SQLD_21_01 A
+WHERE EXISTS (SELECT 'X' FROM SQLD_21_02 B
+WHERE A.V1 = B.V1);
+N1 	V1
+--------- ----------
+1 	A
+3 	B
+4) SELECT * FROM SQLD_21_01 A
+WHERE NOT EXISTS (SELECT 'X' FROM SQLD_21_02 B
+WHERE A.V1 = B.V1);
+N1 	V1
+--------- ----------
+2
+4 	C
+
+--------------------------
+	사전 지식
+NOT IN 의 경우 조건절이 아래와 같이 변형되어 수행됨
+LNNVL(V1 <> :B1 ) -----> NULL 인 경우 Unkown 으로 True Return. --> 조건절 만족, Not Exists 를 만족하지 않음
+HASH AN 으로 풀릴 경우 A.V1 = B.V1 으로 ACCESS 됨
+즉, NOT 조건이므로 NULL 연산이 Unknow 으로 처리되 True 로 반환되는 현상이 나타남
+
+해답
+SQLD_21_02 의 V1 에 NULL 이 존재하므로 NOT IN 경우 NULL 로 인해 모든 조건이 참이 되어
+NOT INT 결과 0건이 RETURN 됨
+
+--------------------------------------------------------------------------------------------------------
+
+8. 아래의 SQL 에서 FUNCTION 자리에 쓰인 함수에 의한 결과값이 다른 하나는? [기출 21회 - 숫자형 함수 ABS, SIGN, MOD, CEIL, FLOOR, ROUND, TRUNC, SIN, COS, TAN..., EXP(), POWER(), SQRT(), LOG(), LN()]
+SELECT function(3.46) FROM DUAL;
+1) TRUNC
+2) CEIL
+3) FLOOR
+4) ROUND
+--------------------------
+사전 지식
+* FLOOR : 숫자보다 작거나 같은 최대 정수를 리턴
+* CEIL/CEILING : 숫자보다 크거나 같은 최소 정수를 리턴
+* TRUNC : 숫자를 소수 m 자리에서 잘라서 리턴 (m default : 0)
+* ROUND : 숫자를 소수 m 자리에서 반올림하여 리턴 (m default : 0)
+
+해답
+
+TRUNC(3.46) = 3, 
+FLOOR(3.46) = 3
+ROUND(3.46)=3
+CEIL(3.46) = 4
+
+--------------------------------------------------------------------------------------------------------
+
+13. 보기의 테이블 TAB_A, TAB_B 에 INSERT 를 한 결과로 알맞은 것은? [기출 21회 - 제약조건의 종류 Primary key, Unique key, Not null, Check, Foreign key]
+TAB_A 		A IDENTITY (1,1) 			TAB_B 		A CHECK (A < 5)
+(Sql Server) 	B VARCHAR2(10) 			(Oracle) 		B VARCHAR2(10)
+INSERT INTO TAB_A(A,B) VALUES(1,'A'); 		INSERT INTO TAB_B VALUES(1,'A');
+INSERT INTO TAB_A(B) VALUES('B'); 			INSERT INTO TAB_B VALUES(2,'B');
+INSERT INTO TAB_A(B) VALUES('D'); 			INSERT INTO TAB_B VALUES(6,'D');
+						INSERT INTO TAB_B VALUES(NULL,'X');
+
+1) 	TAB_A 	TAB_B 			2) 	TAB_A 	TAB_B
+	1,B 	1,A 				1,A 	1,A
+	2,D 	2,B 				2,B 	2,B
+		NULL,X 				3,D 	6,D
+
+3) 	TAB_A 	TAB_B 			4) 	TAB_A 	TAB_B
+	1,A 	1,A 				1,B 	1,A
+		2,B 				2,D 	2,B
+
+--------------------------
+	사전 지식
+* SQL SERVER : IDENTITY [ ( seed , increment ) ]
+  - SEED : 첫번째 행이 입력될 때의 시작값
+  - 증가되는 값
+ - 해당 컬럼에 값을 넣을 경우 Error 발생 (Error 발생을 막기 위해서는
+ IDENTITY_INSERT 를 OFF 로 하면 되나 이런 경우 IDENTITY 를 쓴 의미가 없어짐)
+해답
+SQL SERVER 의 IDENTITY 로 지정된 컬럼에는 값을 넣으면 에러가 남
+ORACLE 의 CHECK 조건을 만족하지 못할 경우 에러가 나나 NULL 은 무시됨
+
+--------------------------------------------------------------------------------------------------------
+
+16. 아래의 SQL 에 대해서 실행 순서를 올바르게 나열한 것은? [기출 21회차 - Select 문장 실행 순서절]
+
+SELECT DEPTNO, COUNT(EMPNO)
+FROM SCOTT.EMP
+WHERE SAL >= 500
+GROUP BY DEPTNO
+HAVING COUNT(EMPNO) > 2
+ORDER BY DEPTNO;
+
+1) FROM -> WHERE -> GROUP BY -> HAVING -> SELECT -> ORDER BY
+2) FROM -> WHERE -> GROUP BY -> HAVING -> ORDER BY -> SELECT
+3) FROM -> WHERE -> HAVING -> GROUP BY -> SELECT -> ORDER BY
+4) FROM -> WHERE -> GROUP BY -> SELECT -> HAVING -> ORDER BY
+
+
+--------------------------------------------------------------------------------------------------------
+
+18. 비교연산자의 어느 한쪽이 VARCHAR 유형 타입인 경우 문자 유형 비교에 대한 설명 중 가장 알맞지 않은 것은? [기출 21회차 - 비교연산자 (문자유형비교)]
+1) 서로 다른 문자가 나올 때까지 비교한다
+2) 길이가 다르다면 짧은 것이 끝날 때까지만 비교한 후에 길이가 긴 것이 크다고 판단한다
+3) 길이가 같고 다른 것이 없다면 같다고 판단한다
+4) 길이가 다르다면 작은 쪽에 SPACE 를 추가하여 길이를 같게 한 후에 비교한다
+
+--------------------------
+해답
+SAPCE 를 추가하여 길이를 맞춰 비교하는 방법은 CHAR 타입인 경우임
+
+--------------------------------------------------------------------------------------------------------
+19. 아래의 SQL 에 대해서 결과값이 다른 것은? [기출 21회차 - 문자형 함수 lower(), upper(), ascii(), char(), concat(), substr(), length(), ltrim(), rtrim(), trim()]
+1) SELECT CONCAT ('RDBMS', ' SQL') FROM DUAL;
+2) SELECT 'RDMBS' || ' SQL' FROM DUAL;
+3) SELECT 'RDBMS' + ' SQL' FROM DUAL;
+4) SELECT 'RDBMS' & ' SQL' FROM DUAL;
+
+--------------------------
+해답
+Oracle 의 결합 함수 : CONCAT / ||
+SQL Server : + 
+
+--------------------------------------------------------------------------------------------------------
+
+20. 아래의 ORACLE SQL 을 SQL SERVER SQL 로 전환한 것중 가장 알맞은 것은? [기출 21회차 - Top N 쿼리, Rownum]
+SELECT ENAME, SAL
+FROM (SELECT ENAME, SAL
+	FROM SCOTT.EMP
+	ORDER BY SAL DESC)
+WHERE ROWNUM < 4 ;
+
+1) 					2)
+SELECT TOP(4) ENAME,SAL 			SELECT TOP(3) ENAME,SAL
+FROM SCOTT.EMP 				FROM SCOTT.EMP
+ORDER BY SAL DESC 			ORDER BY SAL DESC
+
+3) 					4)
+SELECT TOP(4) WITH TIES ENAME,SAL 		SELECT TOP(3) WITH TIES ENAME,SAL
+FROM SCOTT.EMP 				FROM SCOTT.EMP
+ORDER BY SAL DESC 			ORDER BY SAL DESC
+
+--------------------------
+사전 지식
+* TOP (Expression) [PERCENT] [WITH TIES]
+  - WITH TIES : ORDER BY 조건 기준으로 TOP N 의 마지막 행으로 표시되는 추가 행의 데이터가 같을 경우 N+
+                동일 정렬 순서 데이터를 추가 반환하도록 지정하는 옵션 (마지막 기준 공통일 경우 모두 출력)
+해답
+ROWNUM < 4 의 의미는 3건까지 출력이므로 TOP(3) 임
+WITH TIES 를 사용할 경우 동일 데이터가 있을 때 추가 건수가 출력되는 현상이 가능함
+
+
+--------------------------------------------------------------------------------------------------------
+
+26. SQL 구문에서 FROM 절에 대한 설명 중 가장 올바르지 않은 것은? [기출 21회차 - FROM 절]
+1) FROM 절에 ALIAS 를 쓰기 위해서 AS 키워드 사용이 가능하다
+2) FROM 은 가장 먼저 수행된다
+3) FROM 절에 사용되는 subquery 를 보통 inline view 라고 한다
+4) FROM 절은 SELECT 와 항상 짝을 이룬다
+
+
+--------------------------
+해답
+1) FROM 절에 ALIAS 를 쓰기 위해서 AS 키워드 사용이 가능하다
+
+--------------------------------------------------------------------------------------------------------
+1. 아래와 같은 테이블이 있을때 아래와 같은 결과가 나오기 위한 주어진 SQL 구문을 완성하시오 [기출 21회차 - 함수]
+TABLE SQLD_21_01 TABLE SQLD_21_02
+N1 	V1 	N1 	V1
+--------- ---------- --------- ----------
+1 	a 	1 	A
+2 		2
+3 	b 	3 	B
+4 	c
+SELECT A.*
+FROM SQLD_21_01 A,
+	SQLD_21_02 B
+WHERE (		 ) (A.V1) LIKE B.V1||'%'
+
+RESULT> 	N1 	V1
+		1 	a
+		3 	b
+
+--------------------------
+1번 해답 : UPPER
+소문자 / 대문자로 되어 있는 경우 두개의 문자열이 같기 위해서 적용해야 하는 함수 UPPER 를 사용
+
+유사 문제
+유사 문제 만약 주어진 테이블의 데이터가 아래와 같을 경우는 빈칸 제거가 답임
+	TABLE SQLD_21_01 		TABLE SQLD_21_02
+	N1        V1          		N1        V1         
+	--------- ----------  		--------- ---------- 
+        	1 	A (스페이스 뒤에 있음)        1 	A         
+        	2                    			2           
+        	3 	B (스페이스 뒤에 있음)	3 	B         
+        	4 	C (스페이스 뒤에 있음)      
+
+SELECT A.*
+FROM SQLD_21_01 A,
+     SQLD_21_02 B
+WHERE (      )(A.V1) LIKE B.V1
+-> TRIM
+
+--------------------------------------------------------------------------------------------------------
+3. 아래의 NOT EXISTS 구문을 동일한 결과를 출력하는 SQL 로 변경할 때 빈칸을 완성하시오 [기출 21회차 - 다중 행 비교 연산자 IN, ALL, ANY, SOME, EXISTS]
+SELECT ...
+FROM 급여이력 S
+WHERE NOT EXISTS (SELECT 'X'
+		FROM 사원 P
+		WHERE P.사원번호 = S.사원번호)
+
+SELECT ....
+FROM 급여이력 S LEFT OUTER JOIN 사원 P
+ON (S.사원번호 = P.사원번호)
+WHERE (		 )
+
+--------------------------
+3번 해답 : P.사원번호 IS NULL
+NOT EXISTS 의 OUTER JOIN 으로의 변형을 묻는 문제로 NOT EXISTS 는 OUTER JOIN 으로 변경 시
+NOT NULL COLUMN 에 대한 IS NULL 체크로 NOT EXISTS 를 구현가능하다
+
+유사 문제
+SELECT ...
+FROM 급여이력 S
+WHERE NOT EXISTS (SELECT 'X'
+                   FROM 사원 P
+                   WHERE P.사원번호 = S.사원번호)
+                  
+SELECT ....
+FROM 급여이력 S (LEFT OUTER) JOIN 사원 P
+     ON (S.사원번호 = P.사원번호)
+WHERE P.사원번호 IS NULL
+
+--------------------------------------------------------------------------------------------------------
+5. 아래와 같은 SQL 이 있을 때 조건절을 넣기 위한 키워드는 무엇인지 작성하시오 [기출 21회차 - where 절]
+SELECT *
+FROM EMP
+(	 ) EMPID = 10;
+
+--------------------------
+5번 해답 : WHERE
+
+--------------------------------------------------------------------------------------------------------
+7. 아래의 SQL 의 출력 결과를 작성하시오. [기출 21회차 - 다중 행 비교 연산자 IN, ALL, ANY, SOME, EXISTS]
+TAB1 	COL1 	COL2 		TAB2 	COL1 	COL2
+	Z 	10 			Y 	1
+	Y 	20 			Y 	2
+	X 	30 			Y 	3
+
+SELECT COUNT(*)
+FROM TAB1
+WHERE EXISTS (
+	SELECT 1 
+	FROM TAB2 
+	WHERE TAB2.COL1 = 'X');
+
+
+--------------------------
+해답 
+ 0
+
+--------------------------------------------------------------------------------------------------------
+1. 아래와 같은 트랜잭션이 일어났을 때 트랜잭션 종료 후 값이 트랜잭션의 어느 속성을 위배하는가? [기출 24회차 - TCL (트랜잭션)]
+ ( 	)
+Time 		Session 1 		*** 문제의 예제가 적절하지는 않음. 하나의 트랜잭션에서 중간 Erorr
+Start 		10,000 				발생 후 commit 이 되었을 때 그 값이 변했다를 의미함.
+T1 		Update 				이러한 현상이 발생하면 어떤 트랜잭션 속성을 위배했는지를 묻는
+T2 		Error 				문제임
+T3 		Update
+T4 		Commit
+End 		9,000
+
+
+
+-------------------------
+1번 해답 : 원자성
+원자성 : 트랜잭션에서 정의된 연산들은 모두 성공적으로 실행되던지 아니면 전혀 실행되지 않은 상태로 남아 있어야 한다
+일관성 : 트랜잭션이 실행되기 전의 데이터베이스 내용이 잘못 되어 있지 않다면 트랜잭션이 실행된 이후에도 데이터베이스의 내용에 잘못이 있으면 안된다
+고립성 : 트랜잭션이 실행되는 도중에 다른 트랜잭션의 영향을 받아 잘못된 결과를 만들어서는 안된다.
+지속성 : 트랜잭션이 성공적으로 수행되면 그 트랜잭션이 갱신한 데이터베이스의 내용은 영구적으로 저장된다
+
+
+--------------------------------------------------------------------------------------------------------
+
+1. 아래와 같은 명령어가 순서대로 수행된 이후의 결과를 작성하시오 [기출 25회차 - TCL (Commit)]
+<단계별 SQL 수행>
+ - 01 : CREATE TABLE TAB1 (N1 NUMBER, N2 NUMBER) ;
+ - 02 : INSERT INTO TAB1 VALUES (1,1);
+ - 03 : INSERT INTO TAB1 VALUES (2,2);
+ - 04 : CREATE TABLE TAB2 (V1 VARCHAR2(10), V2 VARCHAR2(10));
+ - 05 : ROLLBACK;
+ - 06 : SELECT COUNT(*) FROM TAB1;
+
+-------------------------
+1번 해답 : 2
+
+Oracle 의 경우 DML 후 자동 COMMIT 아니나, 
+	DDL 발생하면 D이 은 암묵적인 COMMIT 이 자동으로 발생되어 전체 트랜잭션이 COMMIT 됨.
+	DDL 이후 ROLLBACK 이 진행되었으나 이미 COMMIT 이 되었으므로 COUNT 는 2 가 됨
+SQL Server 의 경우 자동 COMMIT 이므로 역시 COUNT 는 2가 됨.(문제는 Oracle 이라고 나왔던 것으로 추정됨
+
+--------------------------------------------------------------------------------------------------------
+
+2. 아래와 같은 테이블에 대한 수행 결과가 다음과 같을 때 빈칸을 완성하시오 [기출 25회차 - Where 절]
+<테이블 구조>
+TAB1  		COL1 		COL2
+		A01 		10
+		A02 		20
+` 		A03 		30
+		NULL 		40 	** 문자열이 아닌 NULL 임
+		NULL 		50	** 문자열이 아닌 NULL 임
+
+<실행 결과>
+		CO1 		CO2
+		A02 		20
+		A03 		30
+		NULL 		40
+		NULL 		50
+
+<수행 SQL>
+SELECT COL1, COL2
+FROM TAB1
+WHERE (		 ); 
+-------------------------
+2번 해답 : NVL(COL1,'X') <> 'A01'
+
+WHERE 절에 조건절이 쓰이게 되면 암묵적으로 해당 컬럼에 대한 IS NOT NULL 조건이 생성됨
+수행 결과에 NULL 이 포함되어 있으므로 NVL 함수로 NULL 에 대한 처리를 명시적으로 해줘야 함
+
+--------------------------------------------------------------------------------------------------------
+1. 아래와 같은 테이블이 있을때 아래의 SQL 결과에 대해서 Oracle, SQL Server 순서로 적으시오 [기출 26회차 - length(), len()]
+TAB1 	COL1 CHAR(10)
+	COL2 CHAR(10)
+INSERT INTO TAB1 VALUES ('1','');
+INSERT INTO TAB1 VALUES ('2','');
+INSERT INTO TAB1 VALUES ('3','');
+ -- Oracle 					-- SQL Server
+SELECT SUM(LENGTH(COL1) ) , SUM(LENGTH(COL2) ) 	SELECT SUM(LEN(COL1) ) , SUM(LEN(COL2) )
+FROM TAB1; 					FROM TAB1;
+-------------------------
+1번 해답 : Oracle (30, Null) / SQL Server (3, 0)
+CHAR 형의 경우 고정형으로 사이즈에 비해 작은 값이 들어올 경우 나머지 사이즈를 ' '(스페이스) 로 채운다
+Oracle 의 경우 length 함수는 ' ' (스페이스) 를 1로 인식하고 
+SQL Server 의 len 함수는 문자 뒤의 ' ' 
+(스페이스 0으로 인식한다. 즉 SQL Server 의 Len 은 문자열 뒤의 빈칸은 계산하지 않는다.
+
+<SQL Server LEN 함수>
+SELECT LEN('TechOnTheNet.com'); SELECT LEN('TechOnTheNet.com ');
+Result: 16 Result: 16 (trailing spaces are not included in the calculation)
+
+SELECT LEN(' TechOnTheNet.com'); SELECT LEN(' TechOnTheNet.com ');
+Result: 19 Result: 19 (trailing spaces are not included in the calculation)
+
+SELECT LEN(' ');
+Result: 0 (trailing spaces are not included in the calculation)
+
+SELECT LEN(''); SELECT LEN(NULL);
+Result: 0 Result: NULL
+
+
+--------------------------------------------------------------------------------------------------------
+
+2. 아래와 같이 문자와 문자를 연결하는 함수에 대해서 작성하시오. [기출 26회차 - 문자형 함수 lower(), upper(), ascii(), char(), concat(), substr(), length(), ltrim(), rtrim(), trim()]
+SELECT (   ) (COL1, COL2)
+FROM EMP
+WHERE EMPID = 10;
+
+-------------------------
+2번 해답 : CONCAT
+
+--------------------------------------------------------------------------------------------------------
+3. 아래와 같은 테이블이 있을때 아래와 같은 SQL 의 수행결과에 대해 작성하시오 [기출 26회차 - where 절]
+TAB1  		COL1 		COL2
+		Z 		10
+		Y 		20
+` 		X 		30
+SELECT COUNT(*)
+FROM TAB1
+WHERE COL1 = 'X'
+AND COL2 < 20;
+-------------------------
+3번 해답 : 0
+
+--------------------------------------------------------------------------------------------------------
+
+4. 아래와 같은 테이블이 있을 때 하루에 2번 이상 주문하는 대상을 조회하는 SQL 을 완성하시오 [기출 26회차 - Having Count(*)]
+TAB1  	주문번호
+	주문일자
+	고객명
+`	….
+SELECT 주문일자, 고객명, COUNT(*)
+FROM TAB1
+GROUP BY 주문일자,고객명
+( 		)
+-------------------------
+4번 해답 : HAVING COUNT(*) >= 2
+
+--------------------------------------------------------------------------------------------------------
+
+5. 아래와 같은 수행 결과가 나오도록 SQL 을 완성하시오 [기출 26회차 - 집계 함수 Rollup, Cube, Grouping sets]
+SELECT CASE GROUPING (DNAME) WHEN 1 THEN 'All Departments' ELSE DNAME END AS DNAME,
+ CASE GROUPING (JOB) WHEN 1 THEN 'All Jobs' ELSE JOB END AS JOB,
+ COUNT(*) "Total Empl",
+ SUM(SAL) "Total Sal"
+FROM EMP, DEPT
+WHERE DEPT.DEPTNO = EMP.DEPTNO
+GROUP BY ( );
+
+그림 필요
+
+-------------------------
+5번 해답 : CUBE (DNAME, JOB)
+
+--------------------------------------------------------------------------------------------------------
+
+
+==================================================================
+	제 2장 SQL 활용
+		제 1절 표준 조인
+		제 2절 집합 연산자
+		제 3절 계층형 질의와 셀프 조인
+		제 4절 서브쿼리
+		제 5절 그룹 함수
+		제 6절 윈도우 함수
+		제 7절 DCL
+		제 8절 절차형 SQL
+
+----------------------------------------------------
+10. 아래 쿼리중 결과값이 다른 하나는? [기출 21회 - GROUP 함수 ROLLUP, CUBE, GROUPING SETS || 집합 연산자 UNION, UNION ALL, INTERSECT, EXCEPT]
+1) 						2)
+SELECT DNAME,JOB, 				SELECT DNAME,JOB,
+	COUNT(*) "Total Empl", 				COUNT(*) "Total Empl",
+	SUM(SAL) "Total Sal" 				SUM(SAL) "Total Sal"
+FROM SCOTT.EMP A, 				FROM SCOTT.EMP A,
+	SCOTT.DEPT B 					SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO 			WHERE A.DEPTNO = B.DEPTNO
+GROUP BY ROLLUP(DNAME,JOB) 			GROUP BY GROUPING SETS( (DNAME,JOB),DNAME,NULL)
+ORDER BY DNAME,JOB; 				ORDER BY DNAME,JOB;
+
+3) 						4)
+SELECT DNAME,JOB, 				SELECT DNAME,JOB,
+	COUNT(*) "Total Empl", 				COUNT(*) "Total Empl",
+	SUM(SAL) "Total Sal" 				SUM(SAL) "Total Sal"
+FROM SCOTT.EMP A, 				FROM SCOTT.EMP A,
+	SCOTT.DEPT B 					SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO 			WHERE A.DEPTNO = B.DEPTNO
+GROUP BY DNAME,JOB 				GROUP BY CUBE(DNAME,JOB)
+UNION ALL 					ORDER BY DNAME,JOB;
+SELECT DNAME,'' AS JOB,
+	COUNT(*) "Total Empl",
+	SUM(SAL) "Total Sal"
+FROM SCOTT.EMP A,
+	SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO
+GROUP BY DNAME
+UNION ALL
+SELECT '' AS DNAME,'' AS JOB,
+	COUNT(*) "Total Empl",
+	SUM(SAL) "Total Sal"
+FROM SCOTT.EMP A,
+	SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO
+ORDER BY 1,2;
+
+--------------------------
+	사전 지식
+GROUP BY ROLLUP(DNAME,JOB)  		GROUP BY GROUPING SET(DNAME,JOB)
+ = GROUP BY DNAME,JOB   			= GROUP BY DNAME 
+    UNION ALL    				 UNION ALL 
+    GROUP BY DNAME     			GROUP BY JOB 
+    UNION ALL 
+    모든 집합 그룹 결과
+GROUP BY CUBE(DNAME,JOB)
+ = GROUP BY DNAME,JOB 
+    UNION ALL 
+   GROUP BY DNAME 
+    UNION ALL 
+    GROUP BY JOB
+    UNION ALL
+    모든 집합 그룹 결과
+
+해답
+GROUPING SETS(A,B,C) = 	GROUP BY A 
+			UNION ALL 
+			GROUP BY B 
+			UNION ALL 
+			GROUP BY C 이므로
+4번만 다른 결과를 도출함
+
+----------------------------------------------------
+
+11. 다음의 SQL 을 표준 ANSI SQL 로 알맞게 바꾼것은? [기출 21회 JOIN INNER JOIN, NATURAL JOIN, USING 조건절, ON 조건절, CROSS JOIN, OUTER JOIN]
+단, 조인 조건과 조회 조건은 분리한다.
+SELECT *
+FROM SCOTT.EMP A,
+SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO
+AND B.DNAME = 'SALES'
+
+1) 							2)
+SELECT * 							SELECT *
+FROM SCOTT.EMP A LEFT OUTER JOIN SCOTT.DEPT B		FROM SCOTT.EMP A RIGHT OUTER JOIN SCOTT.DEPT B
+ON ( A.DEPTNO = B.DEPTNO 				ON ( A.DEPTNO = B.DEPTNO
+AND B.DNAME ='SALES') 					AND B.DNAME ='SALES')
+WHERE 1=1; 						WHERE 1=1;
+
+
+3) 							4)
+SELECT * 							SELECT *
+FROM SCOTT.EMP A INNER JOIN SCOTT.DEPT B 		FROM SCOTT.EMP A INNER JOIN SCOTT.DEPT B
+ON ( A.DEPTNO = B.DEPTNO 				ON A.DEPTNO = B.DEPTNO
+AND B.DNAME ='SALES') 					WHERE 1=1
+WHERE 1=1; 						AND B.DNAME ='SALES';
+
+--------------------------
+	사전 지식
+ANSI SQL 에서 조인 조건절 (ON 절) 에 사용된 조건절은 조인 전 조건으로 작용한다
+ON 절 이후 WHERE 절에서 쓰인 조건절은 조인후 조건절로 사용된다.
+
+해답
+조인 조건과 조회 조건이 분리되어야 하므로 조회 조건은 WHERE 절로 분리되어야 함
+OUTER JOIN 이 아닌 INNER JOIN 이므로 INNER JOIN 에 조회 조건 분리가 된 4번이 맞음
+
+----------------------------------------------------
+
+12. 아래 VIEW 에 대한 설명 중 가장 올바르지 않은 것은? [기출 21회 View]
+1) 독립성 : 테이블 구조가 변경되어도 뷰를 사용하는 응용 프로그램은 변경하지 않아도 된다.
+2) 편리성 : 복잡한 질의를 뷰로 생성함으로써 관련 질의를 단순하게 작성할 수 있다.
+또한, 해당 형태의 SQL문을 자주 사용할 때 뷰를 이용하면 편리하게 사용할 수 있다.
+3) 물리성 : 실제 데이터를 가지고 있어서 물리적인 관리가 가능하다
+4) 보안성 : 직원의 급여정보와 같이 숨기고 싶은 정보가 존재한다면， 뷰를 생성할 때 해당 칼럼을 빼고
+생성함으로써 사용자에게 정보를 감출 수 있다
+
+--------------------------
+해답
+View 는 논리적인 SELECT 를 포함하는 OBEJCT 로 실제 데이터를 저장하지 않음
+
+
+--------------------------------------------------------------------------------------------------------
+
+21. 아래의 ANSI JOIN SQL 에서 가장 올바르지 않은 것은? [기출 21회차 - Natural Join]
+1)
+SELECT EMP.DEPTNO, EMPNO, ENAME, DNAME
+FROM EMP INNER JOIN DEPT
+	ON EMP.DEPTNO = DEPT.DEPTNO;
+2)
+SELECT EMP.DEPTNO, EMPNO, ENAME, DNAME
+FROM EMP NATURAL JOIN DEPT;
+3)
+SELECT *
+FROM DEPT JOIN DEPT_TEMP
+USING (DEPTNO);
+4)
+SELECT E.EMPNO, E.ENAME, E.DEPTNO, D.DNAME
+FROM EMP E INNER JOIN DEPT D
+	ON (E.DEPTNO = D.DEPTNO);
+
+--------------------------
+해답
+NATURAL JOIN 에서 사용된 열은 식별자를 가질수 없음. 즉 EMP.DEPTNO 와 같이 OWNER 명을 사용하면 에러가 남
+
+--------------------------------------------------------------------------------------------------------
+
+24. 아래와 같은 테이블 TAB1, TAB2 가 있을 때 아래의 SQL의 결과 건수를 알맞게 나열한 것은? [기출 21회차 - JOIN]
+TAB1 		COL1 		COL2 		KEY1
+		BBB 		123 		B
+		DDD 		222 		C
+		EEE 		233 		D
+		FFF 		143 		E
+
+TAB2 		KEY2 		COL1 		COL2
+		A 		10 		BC
+		B 		10 		CD
+		C 		10 		DE
+SELECT * FROM TAB1 A INNER JOIN TAB2 B ON (A.KEY1 = B.KEY2)
+SELECT * FROM TAB1 A LEFT OUTER JOIN TAB2 B ON (A.KEY1 = B.KEY2)
+SELECT * FROM TAB1 A RIGHT OUTER JOIN TAB2 B ON (A.KEY1 = B.KEY2)
+SELECT * FROM TAB1 A FULL OUTER JOIN TAB2 B ON (A.KEY1 = B.KEY2)
+SELECT * FROM TAB1 A CROSS JOIN TAB2 B
+1) 2, 4, 3, 5, 12
+2) 2, 4, 5, 3, 12
+3) 2, 3, 4, 5, 12
+4) 2, 4, 3, 7, 12
+
+--------------------------
+사전 지식
+FULL OUTER JOIN = LEFT OUTER JOIN UNION RIGHT OUTER JOIN
+
+--------------------------------------------------------------------------------------------------------
+
+25. 아래의 WINDOW FUNCTION 을 사용한 SQL 중 가장 올바르지 않은 것은? [기출 21회차 - Window Function]
+1) SUM(SAL) OVER()
+2) SUM(SAL) OVER(PARTITION BY JOB ORDER BY EMPNO
+	RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) SAL1
+3) SUM(SAL) OVER(PARTITION BY JOB ORDER BY JOB
+	RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) SAL2
+4) SUM(SAL) OVER(PARTITION BY JOB ORDER BY EMPNO
+	RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED PRECEDING) SAL3
+
+--------------------------
+사전 지식
+RANGE BETWEEN start_point AND end_point
+ - start_point는 end_point와 같거나 작은 값이 들어감
+ - Default값은 RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+ - UNBOUNDED PRECEDING : start_point만 들어갈 수 있으며, 파티션의 first row
+ - UNBOUNDED FOLLOWING : end_point만 들어갈 수 있으며, 파티션의 last row
+ - CURRENT ROW : start, end_point 둘다 가능. 윈도우는 CUREENT ROW에서 start하거나 end 함
+
+해답
+UNBOUNDED PRECEDING 은 end point 에 사용될 수 없음
+
+--------------------------------------------------------------------------------------------------------
+27. 아래의 SQL 의 결과로 알맞은 것은? [기출 21회차 - Non Equal Join]
+TABLE SQLD_21_01 	TABLE SQLD_21_02
+N1 	V1 		N1 	V1
+--------- ---------- 	--------- ----------
+1 	A 		1 	A
+2 			2
+3 	B 		3 	B
+4 	C
+
+SELECT SUM(A.N1)
+FROM SQLD_21_01 A,
+	SQLD_21_02 B
+WHERE A.V1 <> B.V1;
+1) 10
+2) 30
+3) 12
+4) 8
+--------------------------
+사전 지식
+Non Equal Join 의 경우는 조인 조건을 제외한 Cross 조인 후
+조인 조건을 필터 조건으로 처리하는 것이 좋음
+해답
+Cross Join 결과 12건에 대한 조건 체크(조건 체크시 NULL 제외) 후 SUM
+그림 필요
+
+A	A	1
+A		1
+A	B	1 -
+	A	2
+		2
+	B	2
+B	A	3
+B		3
+B	B	3 -
+C	A	4
+C		4
+C	B	4 -
+		SUM = 12
+--------------------------------------------------------------------------------------------------------
+28. 서브쿼리에 대한 설명 중 가장 올바르지 않은 것은? [기출 21회차 - 서브쿼리]
+1) 서브쿼리는 괄호로 감싸서 사용한다
+2) 서브쿼리는 비교 연산자와 함게 사용 가능하다
+3) 메인쿼리는 서브쿼리의 컬럼을 쓸수 없다
+4) 서브쿼리는 SELECT 절, FROM 절, WHERE 절등에서 사용 가능하다
+
+--------------------------
+해답
+서브쿼리, 특히 INLINE VIEW 의 컬럼을 메인 쿼리에서도 사용 가능함
+--------------------------------------------------------------------------------------------------------
+
+29. 유저와 권한 중 권한에 대한 설명 중 가장 올바르지 않은 것은? [기출 21회차 - DCL]
+1) 사용자가 실행하는 모든 DDL 문장은 그에 해당하는 적절한 권한이 있어야만 문장을 실행 할 수 있다.
+2) DBA 권한을 가진 유저만이 권한을 부여 할 수 있다
+3) 테이블의 소유자는 해당 테이블의 DML 권한을 다른 유저에게 부여 할 수 있다.
+4) 권한 부여를 편리하게 관리하기 위해 만들어진 권한의 집합인 ROLE 이 있다
+
+--------------------------
+해답
+DBA 권한은 SYSTEM,SYS 등의 상위 유저와 그에 해당하는 권한을 가진 경우 부여 가능
+
+--------------------------------------------------------------------------------------------------------
+2. EMP 테이블은 사원과 메니저의 정보를 담은 계층형 데이터를 포함한 테이블이다. [기출 21회차 - 계층형 질의]
+메니저부터 사원까지 결제 단계가 가장 많은 레벨을 구할려고 할때 빈칸을 완성하시오
+SELECT (	 )
+FROM SCOTT.EMP
+START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR;
+
+--------------------------
+2번 해답 : MAX(LEVEL)
+계층형 쿼리에서 최대 계층의 수를 구하기 위한 문제. MAX (LEVEL) 을 사용하여 최대 계층 수를 구함
+
+--------------------------------------------------------------------------------------------------------
+
+
+4. 아래 SQL 의 출력되는 ROWS 의 개수를 구하시오. [기출 21회차 - 그룹함수 Rollup, Cube, Grouping sets]
+EMP TABLE 	DEPTNO 		JOB 		SAL 		DEPT TABLE 		DEPTNO 		DNAME
+		20 		CLERK 		800 					10 		ACCOUNTING
+		30 		SALESMAN 	1600 					20 		RESEARCH
+		30 		SALESMAN 	1250 					30 		SALES
+		20 		MANAGER 	2975 					40 		OPERATIONS
+		30 		SALESMAN 	1250
+		30 		MANAGER 	2850
+		10 		MANAGER 	2450
+		20 		ANALYST 	3000
+		10 		PRESIDENT 	5000
+		30 		SALESMAN 	1500
+		20 		CLERK 		1100
+		30 		CLERK 		950
+		20 		ANALYST 	3000
+		10 		CLERK 		1300
+
+SELECT DNAME,JOB,
+	COUNT(*) "Total Emp",
+	SUM(SAL) "Total Sal"
+FROM SCOTT.EMP A,
+	SCOTT.DEPT B
+WHERE A.DEPTNO = B.DEPTNO
+GROUP BY CUBE(DNAME,JOB)
+--------------------------
+사전 지식
+** DNAME 의 그룹은 3, JOB 의 그룹은 5, DNAME,JOB 의 그룹은 9개가 형성됨
+** GROUP BY CUBE(DNAME,JOB)
+ = GROUP BY DNAME,JOB 
+   UNION ALL 
+   GROUP BY DNAME 
+   UNION ALL 
+   GROUP BY JOB
+   UNION ALL
+   모든 집합
+
+4번 해답 : 18건
+DNAME 		JOB 		Total Emp 	Total Sal
+				14 		29025
+		CLERK 		4 		4150
+		ANALYST 	2 		6000
+		MANAGER 	3 		8275
+		SALESMAN 	4 		5600
+		PRESIDENT 	1 		5000
+SALES 				6 		9400
+SALES 		CLERK 		1 		950
+SALES 		MANAGER 	1 		2850
+SALES 		SALESMAN 	4 		5600
+RESEARCH 			5 		10875
+RESEARCH 	CLERK 		2 		1900
+RESEARCH 	ANALYST 	2 		6000
+RESEARCH 	MANAGER 	1 		2975
+ACCOUNTING 			3 		8750
+ACCOUNTING 	CLERK 		1 		1300
+ACCOUNTING 	MANAGER 	1 		2450	
+ACCOUNTING 	PRESIDENT 	1 		5000
+
+--------------------------------------------------------------------------------------------------------
+
+6. 아래의 SQL 의 결과로 나오는 ROWS 의 수는? [기출 21회차]
+TAB1	COL1 	TAB2 	COL2
+	1 		1
+	2 		2
+	3 		4
+
+SELECT *
+FROM TAB1 A, TAB2 B
+WHERE A.COL1 <> B.COL1;
+
+--------------------------------------------------------------------------------------------------------
+
+3. 아래와 같은 테이블이 있을 때 수행 결과와 같은 SQL 을 작성하시오 [기출 24회차 - 윈도우 함수 Rank(), Dense_rank(), Row_number()]
+<테이블 구조>
+TAB1 		COL1 		COL2 		COL3
+		0001 		001 		1500
+		0002 		001 		1500
+` 		0003 		001 		1000
+		0004 		001 		500
+		0005 		002 		1000
+		0006 		002 		1000
+		0007 		003 		500
+		0007 		004 		1000
+
+<수행 SQL>
+SELECT *
+FROM (
+ SELECT COL2, ( ) OVER (PARTITION BY COL2 ORDER BY COL3 ) RNUM
+ FROM TAB1
+ )
+WHERE MOD(RNUM,2)=1;
+
+<수행 결과>
+		COL2 		COL3 		RNUM
+		001 		500 		1
+		001 		1500 		3
+		002 		1000 		1
+		003 		500 		1
+		004 		1000 		1
+		*** 동일 등수를 허용하지 않으며 등수에서 짝수등수는 제외함
+
+-------------------------
+3번 풀이
+3번 해답 : ROW_NUMBER
+
+--------------------------------------------------------------------------------------------------------
+4. 아래와 같은 SQL Set Operation (색칠부분) 이 무엇인지 작성하시오. (	 )
+교집합 그림
+
+
+-------------------------
+4번 해답 : INTERSECT
+
+--------------------------------------------------------------------------------------------------------
+
+5. 아래와 같은 계층구조로 되어있는 데이터에 대해서 아래 SQL 수행 결과를 작성하시오.  [기출 24회차 - 계층형 질의]
+( 	,	 ) 
+<테이블 구조>
+TAB1 		EMP_ID 		MGR_ID 		DEPT_NM
+		A 				HEADROOM
+		B 		A 		HEADROOM
+` 		C 		A 		HEADROOM
+		D 		C 		TECH
+		E 		C 		TECH
+
+<수행 SQL>
+SELECT COUNT(EMP_ID), COUNT(MGR_ID)
+FROM TEST_24_10
+WHERE 1=1
+START WITH MGR_ID IS NULL
+CONNECT BY PRIOR EMP_ID = MGR_ID;
+-------------------------
+5번 해답 : 5, 4
+
+--------------------------------------------------------------------------------------------------------
+6. 아래와 같은 계층구조로 되어있는 데이터에 대해서 계층형 결과를 보여주는 SQL 을 작성하시오. [기출 24회차 - 계층형 질의]
+<테이블 구조>
+TAB1 		EMP_ID 		MGR_ID 		DEPT_NM
+		A 				HEADROOM
+		B 		A 		HEADROOM
+` 		C 		A 		HEADROOM
+		D 		C 		TECH
+		E 		C 		TECH
+
+<수행 결과>
+		LEVEL 		사원 		관리자 		ISLEAF 		DEPT_NM
+		1 		A 				0 		HEADROOM
+		2 		B 		A 		1 		HEADROOM
+		2 		C 		A 		0 		HEADROOM
+		3 		D 		C 		1 		TECH
+		3 		E 		C 		1 		TECH
+
+<수행 SQL>
+SELECT LEVEL, LPAD(' ', 4 * (LEVEL-1)) || EMP_ID 사원，
+ MGR_ID, CONNECT_BY_ISLEAF ISLEAF,
+ DEPT_NM
+FROM TEST_24_10
+WHERE 1=1
+START WITH MGR_ID IS NULL
+CONNECT BY PRIOR (		 );
+-------------------------
+6번 해답 : EMP_ID = MGR_ID
+
+--------------------------------------------------------------------------------------------------------
+3. 아래와 같은 테이블에 대한 수행 SQL 결과에 대해서 작성하시오 [기출 25회차 - Join]
+<테이블 구조>
+TAB1 		COL1 		COL2 		TAB2 		COL1 		COL3
+		A01 		10 				A01 		가
+		A02 		20 				A02 		나
+` 		A03 		30 		` 		A03 		다
+		A10 		40 				A04 		라
+		A11 		50 				A05 		마
+
+<수행 SQL>
+SELECT COUNT(*)
+FROM (
+ SELECT A.COL1, B.COL3
+ FROM TAB1 A INNER JOIN TAB2 B
+ 		ON (A.COL1 = B.COL1)
+ UNION
+ SELECT A.COL1, B.COL3
+ FROM TAB1 A LEFT OUTER JOIN TAB2 B
+		 ON (A.COL1 = B.COL1)
+ UNION
+ SELECT COL1, COL3
+ FROM TAB1 NATURAL INNER JOIN TAB2
+ );
+-------------------------
+3번 해답 : 5
+
+--------------------------------------------------------------------------------------------------------
+5. 아래와 같은 테이블이 있을 때 SQL 수행 결과와 동일한 결과를 얻기 위한 SQL 을 작성하시오. [기출 25회차 - GROUP 함수 (집계함수) ROLLUP, CUBE, GROUPING SETS]
+<테이블 구조>
+TAB1 		COL1 		COL2		COL3
+		한국 		A01 		1000
+		한국 		A01 		2000
+` 		한국 		A02 		5000
+		한국 		A02 		3000
+		중국 		B01 		100
+		중국 		B01 		200
+		중국 		B03 		500
+		미국 		C01 		10000
+		미국 		C01 		20000
+		미국 		C03 		5000
+
+<실행 결과>
+		COL1 		COL2 		CNT 		T_SUM
+		미국 		C01 		2 		30000
+		미국 		C03 		1 		5000
+		미국 				3 		35000
+		중국 		B01 		2 		300
+		중국 		B03 		1 		500
+		중국 				3 		800
+		한국 		A01 		2 		3000
+		한국 		A02 		2 		8000
+		한국 				4 		11000
+						10 		46800
+<수행 SQL>
+SELECT COL1, COL2,
+ COUNT(*) AS CNT,
+ SUM(연봉) AS T_SUM
+FROM TAB1
+GROUP BY ( )
+ORDER BY 1,2;
+-------------------------
+5번 해답 : ROLLUP (COL1, COL2)
+
+--------------------------------------------------------------------------------------------------------
+6. 테이블 구조에서 아래와 같은 누적 SUM 을 구하기 위한 SQL 을 완성하시오.(COL3 기준으로 정렬된 누적평균임) [기출 25회차 - Window 함수]
+TAB1 		COL1 		COL2		COL3
+		한국 		A01 		1000
+		한국 		A01 		2000
+` 		한국 		A02 		5000
+		한국 		A02 		3000
+		중국 		B01 		100
+		중국 		B01 		200
+		중국 		B03 		500
+		미국 		C01 		10000
+		미국 		C01 		20000
+		미국 		C03 		5000
+<실행 결과>
+	COL1 		COL2 		COL3 		누적평균	
+	미국 		C03 		5000 		5000
+	미국 		C01 		10000 		7500
+	미국 		C01 		20000 		11667
+	중국 		B01 		100 		100
+	중국 		B01 		200 		150
+	중국 		B03 		500 		267
+	한국 		A01 		1000 		1000
+	한국 		A01 		2000 		1500
+	한국 		A02 		3000 		2000
+	한국 		A02 		5000 		2750
+
+<수행 SQL>
+SELECT COL1, COL2,
+	ROUND ( AVG (COL3) OVER( 	) , 0) AS 누적평균
+FROM TAB1
+ORDER BY COL1, COL3;
+
+
+
+-------------------------
+6번 해답 : 
+	PARTITION BY COL1 ORDER BY COL3 RANGE BETWEEN UNBOUNDED PRECEDING 
+						AND CURRENT ROW
+--------------------------------------------------------------------------------------------------------
+
+7. 아래와 같은 결과처럼 파티션별 윈도우에서 제일 먼저 나오는 것을 0으로, 제일 늦게 나오는 것을 1로 하여 값이 아닌
+ 행의 순서별 백분율을 구하는 Window Funciton 은 무엇인가? [기출 25회차 - Window 함수]
+( 		)
+
+그림 필요
+
+-------------------------
+7번 해답 : PERCENT_RANK
+
+--------------------------------------------------------------------------------------------------------
+
+6. 아래와 같은 수행 결과가 나오도록 SQL 을 완성하시오 [ 기출 26회차 - Window 함수]
+SELECT 매출월,
+ 매출액,
+ ( ) AS 누적매출
+FROM 매출집계
+WHERE 매출월 >= '201701';
+
+<실행 결과>
+매출월 		매출액 		누적매출
+201701 		1000 		1000
+201702 		2000 		3000
+201703 		3000 		6000
+201704 		1000 		7000
+201705 		400 		7400
+201706 		5000 		12400
+-------------------------
+6번 해답 :  SUM(매출액) OVER (PARTITION BY 매출월 ORDER BY 매출월 RANGE BETWEEN UNOBOUNDED PRECED
+
+--------------------------------------------------------------------------------------------------------
+
+
+7. Object 의 권한이나 Role 을 부여할 때 사용하는 명령어는 GRANT 이다. 
+부여된 권한을 회수하는 명령어는? [기출 26회차 - DCL]
+ ( 	)
+-------------------------
+7번 해답 : REVOKE
+
+
+===================================================================
+	제 3장 SQL 최적화 기본 원리
+		제 1절 옵티마이저와 실행계획
+		제 2절 인덱스 기본
+		제 3절 조인 수행 원리
+
+----------------------------------------------------
+7. 학생관련 정보를 조회하는 SQL 을 작성할려고 한다. 조회하는 사람은 주로 학생 본인이
+학번으로 조회를 주로 한다. 이런 SQL 일 때 성능을 개선하는 방법으로 가장 알맞은 것은? [기출 21회 - 규칙기반 옵티마이저]
+1) 학교명을 선두컬럼으로 하는 INDEX 를 생성한다
+2) 학번을 선두컬럼으로 하는 INDEX 를 생성한다
+3) 학교명 + 학번순으로 구성된 INDEX 를 생성한다
+4) 학교명 + 이름 + 학번으로 구성된 INDEX 를 생성한다
+
+--------------------------
+학생 본인이 학번으로 주로 조회를 하기 때문에 학번이 선두 컬럼으로 있는 인덱스가 가장 적절함
+학교명이 앞으로 올 경우 반드시 학교명을 적어야 하는 부담이 있음
+해당 문제는 SQLD 보다는 SQLP 에 가까운 튜닝 문제임
+
+----------------------------------------------------
+
+14. 조인에 대한 설명 중 Hash Join 에 대한 특성으로 부적절한 것 2개를 고르시오 [기출 21회 - 조인 수행 원리 NL Join, Hash Join, Sort Merge Join]
+1) 각 테이블에 INDEX 가 반드시 필요한 것은 아니다
+2) 일반적으로 작은 테이블을 MEMORY 에 올리는 선행 테이블로 사용한다
+3) Non Equal Join 이 가능하다 (비동등)
+4) 조인을 위해 사전 소트 작업이 필요하다
+
+--------------------------
+Hash Join 은 Non Equal Join 은 불가능함. Equal Join 만 가능함
+사전 Sorting 작업이 필요한 Join 알고리즘은 Sort Merge Join 임
+
+--------------------------------------------------------------------------------------------------------
+
+15. 아래의 실행 계획을 올바르게 설명한 것은? [기출 21회 - 실행계획 조인순서, 조인기업, 액세스 기법, 최적화정보, 연산]
+-----------------------------------------------------------
+0 	SELECT STATEMENT Optimizer=ALL_ROWS (Cost=7 Card=9 Bytes=1K)
+1 	0 	HASH JOIN (Cost=7 Card=9 Bytes=1K)
+2 	1 	TABLE ACCESS (FULL) OF 'SCOTT.DEPT' (TABLE) (Cost=3 Card=1 Bytes=30)
+3 	1 	VIEW (Cost=3 Card=9 Bytes=783)
+4 	3 	COUNT (STOPKEY)
+5 	4 	TABLE ACCESS (FULL) OF 'SCOTT.EMP' (TABLE) (Cost=3 Card=14 Bytes=1K)
+-----------------------------------------------------------	
+
+Predicate information (identified by operation id):
+-----------------------------------------------------------
+1 - access("A"."DEPTNO"="B"."DEPTNO")
+2 - filter("B"."DNAME"='SALES')
+4 - filter(ROWNUM<10)
+-----------------------------------------------------------
+1) EMP TABLE 에 대한 행제한 구문이 있다
+2) EMP TABLE 과 DEPT TABLE 은 OUTER JOIN 으로 수행되고 있다
+3) EMP TABLE 과 DEPT TABLE 에서 선행 테이블은 EMP TABLE 이다
+4) DEPT TABLE 은 별도의 조건이 없어 FULL SCAN 을 하고 있다
+
+--------------------------
+	해답
+Outer Join 이라고 표시된 SQL Operation 이 존재하지 않음
+Hash Join 의 선행 테이블은 SCOTT.DEPT 테이블임
+Predicate 정보를 보면 DEPT 테이블에 대한 Full Scan 후 DNAME ='SALES' 로 필터됨
+
+--------------------------------------------------------------------------------------------------------
+
+
+17. 아래와 같은 컬럼으로 구성된 테이블에 COL1 을 구성컬럼으로 가지는 인덱스가 있다.
+가장 효율적으로 해당 인덱스를 사용할 수 있는 조건절은? [기출 21회차]
+
+TAB_A 	COL1 NUMBER 		INDEX COL1
+	COL2 VARCHAR2(10)
+
+1) WHERE COL1 LIKE '2%'
+2) WHERE COL1 = 10
+3) WHERE COL1 IS NOT NULL
+4) WHERE COL1 <> 10
+
+--------------------------
+사전 지식
+* 문자를 숫자형으로 형변환함
+* 예외적으로 LIKE 의 경우 COL 을 무조건 형변환함. 숫자를 문자로 변환함
+
+해답
+LIKE 의 경우 컬럼을 무조건 문자로 형변환함. 즉, 해당 조건절은
+WHERE TO_CHAR(COL1) LIKE '2%' 로 변형되어 인덱스를 사용하지 못함
+IS NOT NULL 은 해당 인덱스를 FULL SCAN 할 수 있으나 효율이 떨어짐
+부정형 비교는 인덱스 사용이 불가함
+
+--------------------------------------------------------------------------------------------------------
+23. 아래의 계층형 SQL 에서 리프 데이터이면 1, 그렇지 않으면 0 을 출력하고 싶을 때 사용하는 키워드로
+알맞은 것은? [기출 21회차 - 계층형 질의] 
+SELECT LEVEL, LPAD(' ',4 * (LEVEL -1) ) || EMPNO,
+	MGR, (	 ) AS ISLEAF
+FROM SCOTT.EMP
+START WITH MGR IS NULL
+CONNECT BY PRIOR EMPNO = MGR;
+
+1) CONNECT_BY_ISLEAF
+2) CONNECT_BY_ISCYCLE
+3) SYS_CONNECT_BY_PATH
+4) CONNECT_BY_ROOT
+
+--------------------------
+사전 지식
+CONNECT_BY_ISLEAF : 전개 과정에서 해당 데이터가 리프 데이터면 1,아니면 0
+CONNECT_BY_ISCYCLE : 전개 과정에서 자식을 갖는데, 해당 데이터가 조상으로 존재하면 1, 그렇지 않으면 0
+ 여기서 조상이란 자신으로부터 루트까지의 경록에 존재하는 데이터를 말함
+SYS_CONNECT_BY_PATH : 하위 레벨의 컬럼까지 모두 표시해줌 (구분자 지정 가능)
+CONNECT_BY_ROOT : Root 노드의 정보를 표시
+
+해답
+CONNECT_BY_ISLEAF : 전개 과정에서 해당 데이터가 리프 데이터면 1,아니면 0
+
+--------------------------------------------------------------------------------------------------------
+
+4. 쿼리를 수행하는데 소요되는 일량 또는 시간을 기반으로 최적화를 수행하는 옵티마이저는 무엇인지 작성하시오. [기출 25회차 - 옵티마이저]
+( ) 옵티마이저
+
+
+-------------------------
+4번 해답 : 비용 기반
+
+--------------------------------------------------------------------------------------------------------
+
+8. 프로그래밍에서 사용되는 중첩된 반복문과 유사한 방식으로 조인을 수행하는 방식을 무엇이라 하는가? [기출 25회차 - 조인 기본원리 Nested Loop Join, NL Join, Sot Merge Join, Hash Join, Scalar SubQuery]
+(		 )
+
+-------------------------
+8번 해답 : NESTED LOOP JOIN
+
+--------------------------------------------------------------------------------------------------------
+
+8. 아래와 같은 상황에서 사용되는 SQL Join Mechanism 을 작성하시오 [ 기출 26회차 - 조인 수행원리 NL Join, Sort Merge Join, Hash Join]
+조건 1 : TAB1 과 TAB2 를 조인하여 결과를 가져와야 한다.
+조건 2 : 두개 테이블에는 인덱스가 없다.
+조건 3 : Equal Join 에서만 해당 조인 방식을 사용할 수 있다.
+
+-------------------------
+8번 해답 : HASH JOIN
+Non Equal Join 이 되지 못하는 Join 은 Hash Join 이며 대량의 데이터를 처리할 때 주로 사용됨
+
+--------------------------------------------------------------------------------------------------------
+
