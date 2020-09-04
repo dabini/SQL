@@ -119,7 +119,7 @@ UPDATE 테이블명 SET 칼럼명=바꾼후레코드 [WHERE 칼럼명=기존레�
 
 
 
-### DELETE
+### DELETE 
 
 ```SQL
 DELETE FROM 테이블명 [WHERE 칼럼명=레코드]; -- WHERE 입력 안하면 테이블 내의 모든 레코드 삭제
@@ -129,7 +129,7 @@ DELETE FROM 테이블명 [WHERE 칼럼명=레코드]; -- WHERE 입력 안하면 
 TRUNCATE FROM 테이블명;
 ```
 
-
+TRUNCATE DDL
 
 
 
